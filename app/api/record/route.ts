@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
-import util from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -9,7 +8,6 @@ import path from 'path';
 // Store the recorder process reference
 let recorderProcess: any = null;
 
-const execAsync = util.promisify(exec);
 // Dynamic temp file path based on language
 const getTempFile = (lang: string) => path.join(process.cwd(), `temp_recording.${lang === 'python' ? 'py' : 'js'}`);
 
@@ -24,7 +22,7 @@ export async function POST(req: Request) {
             const targetFlag = language === 'python' ? '--target python' : '';
             const command = `npx playwright codegen ${url || ''} --output "${tempFile}" ${targetFlag} --viewport-size=1920,1080`;
             
-            recorderProcess = exec(command, (error, stdout, stderr) => {
+            recorderProcess = exec(command, (error) => {
             if (error) console.error('Codegen Error:', error);
             recorderProcess = null;
         });
@@ -41,8 +39,8 @@ export async function POST(req: Request) {
                 process.kill(recorderProcess.pid); // Attempt graceful kill
                 // Force kill if needed (on Windows tree kill is better)
                 exec(`taskkill /pid ${recorderProcess.pid} /T /F`);
-            } catch (e) {
-                console.log("Error killing recorder:", e);
+            } catch {
+                console.log("Error killing recorder");
             }
             recorderProcess = null;
         }

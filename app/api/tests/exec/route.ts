@@ -1,12 +1,9 @@
 
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import util from 'util';
+import { spawn } from 'child_process';
 import db from '@/lib/db';
 import fs from 'fs/promises';
 import path from 'path';
-
-const execAsync = util.promisify(exec);
 
 export async function POST(req: Request) {
   const startTime = Date.now();
@@ -25,71 +22,101 @@ export async function POST(req: Request) {
     runId = info.lastInsertRowid;
 
     let command = '';
+    let args: string[] = [];
     
-    // Determine command based on extension and add screenshot flags
-    if (filePath.endsWith('.py')) {
-        command = `python -m pytest "${filePath}" --screenshot=on`;
-    } else if (filePath.endsWith('.js') || filePath.endsWith('.ts')) {
-        command = `npx playwright test "${filePath}" --reporter=line --screenshot=on`; 
+    // Determine command based on extension
+    const ext = path.extname(filePath).toLowerCase();
+    
+    const LANGUAGE_MAP: Record<string, { command: string, args: string[] }> = {
+        '.py': { command: 'python', args: ['-m', 'pytest', filePath] },
+        '.js': { command: 'npx', args: ['playwright', 'test', filePath, '--reporter=line'] },
+        '.ts': { command: 'npx', args: ['playwright', 'test', filePath, '--reporter=line'] },
+        '.rb': { command: 'ruby', args: [filePath] },
+        '.go': { command: 'go', args: ['run', filePath] },
+        '.php': { command: 'php', args: [filePath] },
+        '.java': { command: 'java', args: [filePath] },
+        '.sh': { command: 'bash', args: [filePath] },
+        '.ps1': { command: 'powershell', args: ['-ExecutionPolicy', 'Bypass', '-File', filePath] },
+        '.bat': { command: 'cmd', args: ['/c', filePath] },
+        '.cmd': { command: 'cmd', args: ['/c', filePath] },
+        '.pl': { command: 'perl', args: [filePath] },
+        '.lua': { command: 'lua', args: [filePath] },
+        '.r': { command: 'Rscript', args: [filePath] },
+        '.rs': { command: 'rustc', args: [filePath] }, // Compile only? Typically cargo run is used for projects
+        '.dart': { command: 'dart', args: ['run', filePath] },
+    };
+
+    const config = LANGUAGE_MAP[ext];
+
+    if (config) {
+        command = config.command;
+        args = config.args;
     } else {
-        return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+        // Fallback or Error
+        // Try to execute directly if it has no extension or unknown
+         return NextResponse.json({ error: `Unsupported file type: ${ext}` }, { status: 400 });
     }
 
-    try {
-        const { stdout, stderr } = await execAsync(command);
-        const logs = (stdout + '\n' + stderr);
-        const duration = Date.now() - startTime;
-        
-        // Try to find screenshot
-        let screenshotPath = '';
-        try {
-            const resultsDir = path.join(process.cwd(), 'test-results');
-            const dirs = await fs.readdir(resultsDir);
-            if (dirs.length > 0) {
-                // Find latest screenshot in latest result dir
-                const latestDir = dirs.sort().reverse()[0];
-                const shotFiles = await fs.readdir(path.join(resultsDir, latestDir));
-                const shot = shotFiles.find(f => f.endsWith('.png'));
-                if (shot) {
-                    const newName = `run_${runId}_${Date.now()}.png`;
-                    const publicPath = path.join(process.cwd(), 'public', 'screenshots', newName);
-                    await fs.copyFile(path.join(resultsDir, latestDir, shot), publicPath);
-                    screenshotPath = `/screenshots/${newName}`;
-                }
-            }
-        } catch (e) {}
+    const encoder = new TextEncoder();
+    const customStream = new ReadableStream({
+        start(controller) {
+            const child = spawn(command, args, { shell: true });
+            let logs = '';
 
-        db.prepare('UPDATE test_runs SET status = ?, logs = ?, duration_ms = ?, screenshot = ? WHERE id = ?')
-          .run('passed', logs, duration, screenshotPath, runId);
+            const handleData = (data: Buffer) => {
+                const text = data.toString();
+                logs += text;
+                controller.enqueue(encoder.encode(text));
+            };
 
-        return NextResponse.json({ success: true, logs: logs.split('\n'), result: true, screenshot: screenshotPath });
-    } catch (e: any) {
-        const logs = (e.stdout + '\n' + e.stderr);
-        const duration = Date.now() - startTime;
+            child.stdout.on('data', handleData);
+            child.stderr.on('data', handleData);
 
-        // Try to find screenshot on failure
-        let screenshotPath = '';
-        try {
-            const resultsDir = path.join(process.cwd(), 'test-results');
-            const dirs = await fs.readdir(resultsDir);
-            if (dirs.length > 0) {
-                const latestDir = dirs.sort().reverse()[0];
-                const shotFiles = await fs.readdir(path.join(resultsDir, latestDir));
-                const shot = shotFiles.find(f => f.endsWith('.png'));
-                if (shot) {
-                    const newName = `run_${runId}_fail_${Date.now()}.png`;
-                    const publicPath = path.join(process.cwd(), 'public', 'screenshots', newName);
-                    await fs.copyFile(path.join(resultsDir, latestDir, shot), publicPath);
-                    screenshotPath = `/screenshots/${newName}`;
-                }
-            }
-        } catch (err) {}
+            child.on('close', async (code) => {
+                const duration = Date.now() - startTime;
+                let status = code === 0 ? 'passed' : 'failed';
+                
+                // Screenshot handling (same logic as before)
+                let screenshotPath = '';
+                try {
+                    const resultsDir = path.join(process.cwd(), 'test-results');
+                    const dirs = await fs.readdir(resultsDir);
+                    if (dirs.length > 0) {
+                        const latestDir = dirs.sort().reverse()[0];
+                        const shotFiles = await fs.readdir(path.join(resultsDir, latestDir));
+                        const shot = shotFiles.find(f => f.endsWith('.png'));
+                        if (shot) {
+                             const newName = `run_${runId}_${status}_${Date.now()}.png`;
+                             const publicPath = path.join(process.cwd(), 'public', 'screenshots', newName);
+                             await fs.copyFile(path.join(resultsDir, latestDir, shot), publicPath);
+                             screenshotPath = `/screenshots/${newName}`;
+                        }
+                    }
+                } catch (_e) {}
 
-        db.prepare('UPDATE test_runs SET status = ?, logs = ?, duration_ms = ?, screenshot = ? WHERE id = ?')
-          .run('failed', logs, duration, screenshotPath, runId);
+                // Update DB
+                db.prepare('UPDATE test_runs SET status = ?, logs = ?, duration_ms = ?, screenshot = ? WHERE id = ?')
+                  .run(status, logs, duration, screenshotPath, runId);
+                
+                controller.close();
+            });
 
-        return NextResponse.json({ success: true, result: false, logs: logs.split('\n'), screenshot: screenshotPath });
-    }
+            child.on('error', (err) => {
+                logs += `\nError: ${err.message}`;
+                db.prepare('UPDATE test_runs SET status = ?, logs = ? WHERE id = ?')
+                  .run('failed', logs, runId);
+                controller.enqueue(encoder.encode(`\nError: ${err.message}`));
+                controller.close();
+            });
+        }
+    });
+
+    return new NextResponse(customStream, {
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+        },
+    });
 
   } catch (error: any) {
     if (runId) {

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       try {
           await page.waitForSelector(selector, { timeout: 5000 });
           data = await page.$$eval(selector, (elements) => elements.map(el => el.textContent?.trim()));
-      } catch (e) {
+      } catch (_e) {
           data = { warning: `Selector "${selector}" not found.` };
       }
     } else {

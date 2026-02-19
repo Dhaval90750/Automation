@@ -1,5 +1,5 @@
 
-import { TestRunner } from './test-runner';
+import { TestRunner } from './test-runner-v2';
 
 export class RunManager {
     private static instance: RunManager;

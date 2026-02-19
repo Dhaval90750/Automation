@@ -3,8 +3,7 @@ import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
-import path from 'path';
-import { runManager } from '@/lib/run-manager';
+
 
 const execAsync = util.promisify(exec);
 const REPORT_FILE = 'cucumber-report.json';
@@ -26,14 +25,14 @@ export async function POST(req: Request) {
     }
     
     try {
-        const { stdout, stderr } = await execAsync(command);
+        const { stdout } = await execAsync(command);
         
         // Read report
         let report = [];
         try {
             const reportContent = await fs.readFile(REPORT_FILE, 'utf-8');
             report = JSON.parse(reportContent);
-        } catch(e) { /* ignore if no report */ }
+        } catch { /* ignore if no report */ }
 
         return NextResponse.json({ success: true, logs: stdout, report });
     } catch (e: any) {
@@ -42,7 +41,7 @@ export async function POST(req: Request) {
         try {
             const reportContent = await fs.readFile(REPORT_FILE, 'utf-8');
             report = JSON.parse(reportContent);
-        } catch(err) { /* ignore */ }
+        } catch { /* ignore */ }
         
         return NextResponse.json({ success: true, result: false, logs: e.stdout + '\n' + e.stderr, report });
     }

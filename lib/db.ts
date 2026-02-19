@@ -11,22 +11,10 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
-    steps TEXT NOT NULL, -- Array of atomic steps
+    steps TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  );
-`);
-
-// Ensure columns exist (outside of main exec)
-try {
-    db.exec('ALTER TABLE test_runs ADD COLUMN screenshot TEXT');
-} catch(e) {}
-try {
-    db.exec('ALTER TABLE test_runs ADD COLUMN test_path TEXT');
-} catch(e) {}
-
-db.exec(`
   CREATE TABLE IF NOT EXISTS pages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
@@ -40,7 +28,7 @@ db.exec(`
     page_id INTEGER,
     name TEXT NOT NULL,
     selector TEXT NOT NULL,
-    type TEXT, -- 'button', 'input', 'text', etc.
+    type TEXT,
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(page_id) REFERENCES pages(id)
@@ -50,7 +38,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     page_id INTEGER,
     name TEXT NOT NULL,
-    steps TEXT NOT NULL, -- JSON array of steps
+    steps TEXT NOT NULL,
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(page_id) REFERENCES pages(id)
@@ -58,12 +46,79 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS scheduled_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    test_id INTEGER NOT NULL, -- references test_flows(id) or just a file path/name if ad-hoc
-    test_type TEXT DEFAULT 'flow', -- 'flow' or 'file'
+    test_id INTEGER NOT NULL,
+    test_type TEXT DEFAULT 'flow', -- 'flow', 'workflow'
     test_name TEXT,
     cron_schedule TEXT NOT NULL,
     active BOOLEAN DEFAULT 1,
     last_run DATETIME,
+    next_run DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- v3.0 New Tables --
+
+  CREATE TABLE IF NOT EXISTS workflows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    definition_json TEXT NOT NULL, -- JSON string of React Flow nodes/edges
+    version INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS workflow_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workflow_id INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'running', 'completed', 'failed'
+    start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    end_time DATETIME,
+    duration_ms INTEGER,
+    trigger_type TEXT DEFAULT 'manual', -- 'manual', 'scheduled', 'webhook'
+    context_snapshot TEXT, -- JSON snapshot of variables at start
+    FOREIGN KEY(workflow_id) REFERENCES workflows(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS node_executions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workflow_run_id INTEGER NOT NULL,
+    node_id TEXT NOT NULL, -- ID from React Flow
+    status TEXT DEFAULT 'pending',
+    start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    end_time DATETIME,
+    duration_ms INTEGER,
+    logs TEXT, -- JSON array of log strings
+    result_json TEXT, -- Output data from the node
+    error_message TEXT,
+    FOREIGN KEY(workflow_run_id) REFERENCES workflow_runs(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS functions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    code TEXT NOT NULL, -- JS code body
+    param_schema TEXT, -- JSON schema for inputs
+    version INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS datasets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL, -- 'csv', 'json'
+    content_path TEXT NOT NULL, -- Path to file on disk
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Visual Regression Tables
+  CREATE TABLE IF NOT EXISTS visual_baselines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_name TEXT NOT NULL, 
+    snapshot_name TEXT NOT NULL,
+    image_path TEXT NOT NULL,
+    version INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);

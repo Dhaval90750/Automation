@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Editor from '@monaco-editor/react';
 import { 
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-    BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area 
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+    BarChart, Bar, AreaChart, Area 
 } from 'recharts';
-import { Loader2, Play, Search, Terminal, FileCode, Save, Plus, FolderOpen, Lock, ChevronDown, ChevronUp, Video, Eye, EyeOff, LayoutTemplate, Database, Trash2, StopCircle, Sparkles, MessageSquare, Clock, Square, RefreshCw, ChevronRight, Settings2, Code2, Rocket, Globe, Wand2, Monitor, Layout, Sidebar, History, Calendar, FileText, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Terminal, FileCode, Save, Plus, FolderOpen, LayoutTemplate, Trash2, Clock, Rocket, Monitor, Layout, History, CheckCircle2, XCircle, Wand2, Calendar, Code2, Sparkles, Database } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -14,36 +15,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'];
-
-// Helper Components 
-const VisualComparisonSlider = ({ baseline, actual, diff }: { baseline?: string, actual?: string, diff?: string }) => {
-    const [sliderPos, setSliderPos] = useState(50);
-    const [selectedView, setSelectedView] = useState<'slider' | 'diff'>('slider');
-    if (!baseline || !actual) return <div className="h-64 flex items-center justify-center text-neutral-600 italic">Select a snapshot to compare</div>;
-    return (
-        <div className="space-y-4">
-            <div className="flex bg-neutral-800 rounded p-1 w-fit">
-                <button onClick={() => setSelectedView('slider')} className={cn("px-3 py-1 text-xs rounded", selectedView === 'slider' ? "bg-neutral-700 text-white" : "text-neutral-500")}>Slider</button>
-                <button onClick={() => setSelectedView('diff')} className={cn("px-3 py-1 text-xs rounded", selectedView === 'diff' ? "bg-neutral-700 text-white" : "text-neutral-500")}>Highlight Diff</button>
-            </div>
-            <div className="relative h-[400px] border border-neutral-800 rounded-2xl overflow-hidden bg-black flex items-center justify-center shadow-2xl">
-                {selectedView === 'slider' ? (
-                    <>
-                        <img src={actual} className="absolute inset-0 w-full h-full object-contain" alt="Actual" />
-                        <div className="absolute inset-0 w-full h-full" style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
-                            <img src={baseline} className="absolute inset-0 w-full h-full object-contain" alt="Baseline" />
-                        </div>
-                        <div className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-10" style={{ left: `${sliderPos}%` }}>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-2xl flex items-center justify-center"><Search className="w-4 h-4 text-black" /></div>
-                        </div>
-                        <input type="range" min="0" max="100" value={sliderPos} onChange={(e) => setSliderPos(parseInt(e.target.value))} className="absolute inset-0 opacity-0 cursor-ew-resize z-20" />
-                    </>
-                ) : <img src={diff} className="w-full h-full object-contain" alt="Diff" />}
-            </div>
-        </div>
-    );
-};
+// Helper Components
 
 const AnalyticsDashboard = ({ stats, history }: { stats: any, history: any[] }) => {
     const timelineData = history?.length > 0 ? history.map(run => ({
@@ -111,7 +83,7 @@ const NoCodeStepBuilder = ({ steps, onStepsChange }: { steps: any[], onStepsChan
             </div>
             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-neutral-800">
                 {steps.map((step, idx) => (
-                    <div key={step.id} className="group relative flex items-center space-x-3 bg-neutral-950/50 p-3 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-all">
+                    <div key={step.id || `step-${idx}`} className="group relative flex items-center space-x-3 bg-neutral-950/50 p-3 rounded-xl border border-neutral-800 hover:border-neutral-700 transition-all">
                         <span className="text-[10px] font-bold text-neutral-700 w-4">{idx + 1}</span>
                         <select value={step.action} onChange={(e) => updateStep(step.id, 'action', e.target.value)} className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-[10px] text-blue-400 outline-none">
                             <option value="goto">Navigate</option><option value="click">Click</option><option value="type">Type</option><option value="assertion">Verify</option><option value="waitFor">Wait For</option>
@@ -221,8 +193,13 @@ const ExecutionHistory = ({ runs, onOpenScript }: { runs: any[], onOpenScript: (
     );
 };
 
+// ... imports
+import { Modal, InputModal, ConfirmModal } from '@/app/components/ui/Modal';
+
+// ... (previous helper components)
+
 export default function ManagementPage() {
-    const [activeTab, setActiveTab] = useState<'tests' | 'pom' | 'analytics' | 'history' | 'cicd' | 'bdd' | 'suites'>('tests');
+    const [activeTab, setActiveTab] = useState<'tests' | 'pom' | 'analytics' | 'history' | 'cicd' | 'bdd' | 'suites' | 'data'>('tests');
     const [files, setFiles] = useState<any[]>([]);
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [fileContent, setFileContent] = useState('');
@@ -231,28 +208,160 @@ export default function ManagementPage() {
     const [pages, setPages] = useState<any[]>([]);
     const [selectedPage, setSelectedPage] = useState<any>(null);
     const [selectors, setSelectors] = useState<any[]>([]);
-    const [pageTests, setPageTests] = useState<any[]>([]);
     const [stats, setStats] = useState<any>(null);
     const [runHistory, setRunHistory] = useState<any[]>([]);
-    const [jobs, setJobs] = useState<any[]>([]);
-    const [suites, setSuites] = useState<{ [tag: string]: any[] }>({});
-    const [bddTags, setBddTags] = useState<string>('');
-    const [snapshots, setSnapshots] = useState<string[]>([]);
-    const [selectedSnapshot, setSelectedSnapshot] = useState<string>('');
-    const [visualImages, setVisualImages] = useState<{ baseline?: string, actual?: string, diff?: string }>({});
+    const [_jobs, setJobs] = useState<any[]>([]);
+    const [_suites, setSuites] = useState<{ [tag: string]: any[] }>({});
+    const [_snapshots, setSnapshots] = useState<string[]>([]);
+    const [dataFiles, setDataFiles] = useState<string[]>([]);
+    const [selectedDataFile, setSelectedDataFile] = useState<string | null>(null);
+    const [dataContent, setDataContent] = useState('');
+
+    // Modal States
+    const [modalState, setModalState] = useState<{
+        type: 'input' | 'confirm' | null;
+        action: string | null;
+        title: string;
+        label?: string;
+        message?: string;
+        defaultValue?: string;
+        placeholder?: string;
+        submitText?: string;
+        confirmText?: string;
+        intent?: 'danger' | 'primary';
+        payload?: any;
+    }>({ type: null, action: null, title: '' });
 
     useEffect(() => {
-        fetchFiles(); fetchPages(); fetchJobs(); fetchSuites(); fetchReports();
+        fetchFiles(); fetchPages(); fetchJobs(); fetchSuites(); fetchReports(); fetchDataFiles();
     }, []);
 
-    const fetchFiles = async () => { const res = await fetch('/api/files'); const json = await res.json(); if (json.success) setFiles(json.files); };
+    // ... (fetch functions remain same) ...
+     const fetchFiles = async () => { const res = await fetch('/api/files'); const json = await res.json(); if (json.success) setFiles(json.files); };
     const fetchPages = async () => { const res = await fetch('/api/pom?type=pages'); const json = await res.json(); if (json.success) setPages(json.data); };
     const fetchSelectors = async (pageId: number) => { const res = await fetch(`/api/pom?type=selectors&pageId=${pageId}`); const json = await res.json(); if (json.success) setSelectors(json.data); };
     const fetchJobs = async () => { const res = await fetch('/api/jobs'); const json = await res.json(); if (json.success) setJobs(json.jobs); };
     const fetchSuites = async () => { const res = await fetch('/api/suites'); const json = await res.json(); if (json.success) setSuites(json.suites); };
     const fetchReports = async () => { const res = await fetch('/api/reports'); const json = await res.json(); if (json.success) { setStats(json.stats); setRunHistory(json.runs); } };
     const fetchSnapshots = async () => { const res = await fetch('/api/visual'); const json = await res.json(); if (json.success) setSnapshots(json.snapshots); };
-    
+    const fetchDataFiles = async () => { 
+        const res = await fetch('/api/data'); 
+        const json = await res.json(); 
+        if (json.success) setDataFiles(json.files); 
+    };
+
+    const loadDataFile = async (name: string) => {
+        setSelectedDataFile(name);
+        const res = await fetch(`/api/data?path=${name}`);
+        const json = await res.json();
+        if (json.success) {
+            setDataContent(JSON.stringify(json.data, null, 2));
+        }
+    };
+
+    const saveDataFile = async () => {
+        if (!selectedDataFile) return;
+        const res = await fetch('/api/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: selectedDataFile, content: dataContent })
+        });
+        if ((await res.json()).success) {
+            setTerminalLogs(prev => [...prev, `Saved Data: ${selectedDataFile}`]);
+            fetchDataFiles();
+        }
+    };
+
+    // --- Modal Actions ---
+
+    const handleInputSubmit = async (value: string) => {
+        const { action, payload } = modalState;
+        
+        if (action === 'createDataFile') {
+            const res = await fetch('/api/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: value, content: value.endsWith('.json') ? '[]' : 'col1,col2' })
+            });
+            if ((await res.json()).success) fetchDataFiles();
+        }
+        else if (action === 'createFile') {
+            const res = await fetch('/api/files', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: value, content: value.endsWith('.json') ? '[]' : '# New Test Script' })
+            });
+            if ((await res.json()).success) fetchFiles();
+        }
+        else if (action === 'createPage') {
+            // This needs two steps (name + url), but let's simplify for now or use specific modal.
+            // Actually, let's keep it simple: Name first, then specific modal for URL or just default URL. 
+            // OR we can make a custom modal for Create Page. 
+            // Implementing a simpler flow: Just create generic page object, user edits details later if we had UI.
+            // But we need URL. Let's trigger a second modal or just ask for Name and set empty desc.
+            // Wait, we can't easily chain modals with this simple state. 
+            // Let's assume user enters "Name" and we add placeholders.
+            const res = await fetch('/api/pom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'page', name: value, url: 'https://example.com', description: '' })
+            });
+            if ((await res.json()).success) fetchPages();
+        }
+         else if (action === 'addSelector') {
+            // Similarly, needs Name and Selector. 
+            // Let's use a delimited string or just ask for Name and default selector?
+            // "Login Button | #login"
+            const [name, selector] = value.includes('|') ? value.split('|').map(s => s.trim()) : [value, ''];
+            if (!name) return;
+            
+            const res = await fetch('/api/pom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'selector', pageId: payload.id, name, selector: selector || '.selector', elementType: 'button' })
+            });
+            if ((await res.json()).success) fetchSelectors(payload.id);
+        }
+    };
+
+    const handleConfirm = async () => {
+        const { action, payload } = modalState;
+
+        if (action === 'deleteDataFile') {
+            const res = await fetch(`/api/data?name=${payload}`, { method: 'DELETE' });
+            if ((await res.json()).success) {
+                if (selectedDataFile === payload) { setSelectedDataFile(null); setDataContent(''); }
+                fetchDataFiles();
+            }
+        }
+        else if (action === 'deleteFile') {
+             const res = await fetch(`/api/files?path=${payload}`, { method: 'DELETE' });
+            if ((await res.json()).success) {
+                if (selectedFile === payload) { setSelectedFile(null); setFileContent(''); }
+                fetchFiles();
+            }
+        }
+        else if (action === 'deletePage') {
+            const res = await fetch(`/api/pom?type=page&id=${payload.id}`, { method: 'DELETE' });
+            if ((await res.json()).success) {
+                if (selectedPage?.id === payload.id) setSelectedPage(null);
+                fetchPages();
+            }
+        }
+    };
+
+    // --- Action Triggers ---
+
+    const openCreateDataFile = () => setModalState({ 
+        type: 'input', action: 'createDataFile', title: 'Create Data Source', label: 'File Name', placeholder: 'users.json' 
+    });
+    const openDeleteDataFile = (name: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setModalState({ 
+            type: 'confirm', action: 'deleteDataFile', title: 'Delete Data Source', message: `Are you sure you want to delete ${name}? This action cannot be undone.`, payload: name, intent: 'danger', confirmText: 'Delete' 
+        });
+    };
+
     const loadFile = async (path: string) => { 
         setSelectedFile(path); 
         const res = await fetch(`/api/files/read?path=${path}`); 
@@ -275,64 +384,37 @@ export default function ManagementPage() {
         }
     };
 
-    const createFile = async () => {
-        const name = prompt('Enter file name (e.g. login.py):');
-        if (!name) return;
-        const res = await fetch('/api/files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path: name, content: name.endsWith('.json') ? '[]' : '# New Test Script' })
-        });
-        if ((await res.json()).success) fetchFiles();
-    };
+    const openCreateFile = () => setModalState({
+        type: 'input', action: 'createFile', title: 'Create Test Script', label: 'Script Name', placeholder: 'login.spec.ts', submitText: 'Create Script'
+    });
 
-    const deleteFile = async (path: string, e: React.MouseEvent) => {
+    const openDeleteFile = (path: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm(`Delete ${path}?`)) return;
-        const res = await fetch(`/api/files?path=${path}`, { method: 'DELETE' });
-        if ((await res.json()).success) {
-            if (selectedFile === path) { setSelectedFile(null); setFileContent(''); }
-            fetchFiles();
-        }
-    };
-
-    const createPage = async () => {
-        const name = prompt('Enter page name:');
-        const url = prompt('Enter base URL:');
-        if (!name) return;
-        const res = await fetch('/api/pom', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'page', name, url, description: '' })
+        setModalState({
+            type: 'confirm', action: 'deleteFile', title: 'Delete Script', message: `Permanently delete ${path}?`, payload: path, intent: 'danger', confirmText: 'Delete'
         });
-        if ((await res.json()).success) fetchPages();
     };
 
-    const deletePage = async (id: number, e: React.MouseEvent) => {
+    const openCreatePage = () => setModalState({
+        type: 'input', action: 'createPage', title: 'Create Page Object', label: 'Page Name', placeholder: 'Dashboard Page'
+    });
+
+    const openDeletePage = (id: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('Delete this page and its selectors?')) return;
-        const res = await fetch(`/api/pom?type=page&id=${id}`, { method: 'DELETE' });
-        if ((await res.json()).success) {
-            if (selectedPage?.id === id) setSelectedPage(null);
-            fetchPages();
-        }
+        setModalState({
+            type: 'confirm', action: 'deletePage', title: 'Delete Page Object', message: 'Delete this page and all associated selectors?', payload: { id }, intent: 'danger', confirmText: 'Delete Page'
+        });
     };
 
     useEffect(() => {
         if (selectedPage) fetchSelectors(selectedPage.id);
     }, [selectedPage]);
 
-    const addSelector = async () => {
+    const openAddSelector = () => {
         if (!selectedPage) return;
-        const name = prompt('Selector Name:');
-        const selectorValue = prompt('Selector (CSS/XPath):');
-        if (!name || !selectorValue) return;
-        const res = await fetch('/api/pom', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'selector', pageId: selectedPage.id, name, selector: selectorValue, elementType: 'button' })
+        setModalState({
+             type: 'input', action: 'addSelector', title: 'Add Selector', label: 'Name | Selector', placeholder: 'Submit Button | #submit-btn', payload: { id: selectedPage.id }, submitText: 'Add Selector'
         });
-        if ((await res.json()).success) fetchSelectors(selectedPage.id);
     };
 
     const deleteSelector = async (id: number) => {
@@ -353,30 +435,51 @@ export default function ManagementPage() {
 
     return (
         <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 flex flex-col space-y-6">
-            <header className="flex items-center justify-between border-b border-neutral-800 pb-6">
-                <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-purple-600 rounded-lg shadow-lg shadow-purple-900/20 hover:scale-105 transition-transform"><Layout className="w-6 h-6 text-white" /></div>
-                    <div><h1 className="text-2xl font-bold text-white tracking-tight">Automation Management</h1><p className="text-neutral-500 text-sm font-medium">Unified Control Plane for Test Ecosystem</p></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                    <a href="/" className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white rounded-lg text-sm font-bold border border-neutral-800 transition-all flex items-center space-x-2">
-                        <Monitor className="w-4 h-4" /><span>Live Dashboard</span>
-                    </a>
-                </div>
-            </header>
-
+            <InputModal 
+                isOpen={modalState.type === 'input'}
+                onClose={() => setModalState({ ...modalState, type: null })}
+                onSubmit={handleInputSubmit}
+                title={modalState.title}
+                label={modalState.label || ''}
+                placeholder={modalState.placeholder}
+                submitText={modalState.submitText}
+            />
+            <ConfirmModal 
+                isOpen={modalState.type === 'confirm'}
+                onClose={() => setModalState({ ...modalState, type: null })}
+                onConfirm={handleConfirm}
+                title={modalState.title}
+                message={modalState.message || ''}
+                intent={modalState.intent}
+                confirmText={modalState.confirmText}
+            />
             <div className="flex bg-neutral-900/50 border border-neutral-100/5 backdrop-blur-md rounded-2xl p-1.5 w-fit self-center shadow-2xl">
                 {[
                     { id: 'tests', label: 'Test Scripts', icon: FileCode },
                     { id: 'pom', label: 'Page Objects', icon: LayoutTemplate },
                     { id: 'analytics', label: 'Analytics', icon: History },
                     { id: 'history', label: 'History', icon: Clock },
-                    { id: 'cicd', label: 'CI/CD', icon: Rocket },
-                    { id: 'bdd', label: 'BDD', icon: Sparkles },
-                    { id: 'suites', label: 'Suites', icon: Layout },
-                ].map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={cn("flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-300", activeTab === tab.id ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.15)] scale-105" : "text-neutral-500 hover:text-neutral-100 hover:bg-white/5")}>
-                        <tab.icon className="w-4 h-4" /><span>{tab.label}</span>
+                    { id: 'ci', label: 'CI/CD', icon: Rocket },
+                    { id: 'bdd', label: 'BDD', icon: Code2 },
+                    { id: 'suites', label: 'Suites', icon: Database },
+                    { id: 'data', label: 'Data Sources', icon: FileCode }
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => {
+                            setActiveTab(tab.id as any);
+                            if (tab.id === 'tests') fetchFiles();
+                            if (tab.id === 'pom') fetchPages();
+                            if (tab.id === 'data') fetchDataFiles();
+                        }}
+                        className={cn(
+                            "flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition-all relative",
+                            activeTab === tab.id ? "text-white shadow-lg" : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
+                        )}
+                    >
+                        {activeTab === tab.id && <div className="absolute inset-0 bg-neutral-800 rounded-xl -z-10 animate-in zoom-in-95 duration-200" />}
+                        <tab.icon className={cn("w-3.5 h-3.5", activeTab === tab.id ? "text-white" : "text-neutral-500")} />
+                        <span>{tab.label}</span>
                     </button>
                 ))}
             </div>
@@ -386,17 +489,31 @@ export default function ManagementPage() {
                     <div className="p-5 border-b border-neutral-800 flex items-center justify-between">
                         <span className="font-black text-[10px] uppercase text-neutral-600 tracking-[0.2em]">Management Explorer</span>
                         <div className="flex items-center space-x-2">
-                             {activeTab === 'tests' && <button onClick={createFile} className="p-1 hover:bg-neutral-800 rounded text-purple-400" title="New Script"><Plus className="w-4 h-4" /></button>}
-                             {activeTab === 'pom' && <button onClick={createPage} className="p-1 hover:bg-neutral-800 rounded text-emerald-400" title="New Page"><Plus className="w-4 h-4" /></button>}
+                             {activeTab === 'tests' && <button onClick={openCreateFile} className="p-1 hover:bg-neutral-800 rounded text-purple-400" title="New Script"><Plus className="w-4 h-4" /></button>}
+                             {activeTab === 'pom' && <button onClick={openCreatePage} className="p-1 hover:bg-neutral-800 rounded text-emerald-400" title="New Page"><Plus className="w-4 h-4" /></button>}
+                             {activeTab === 'data' && <button onClick={openCreateDataFile} className="p-1 hover:bg-neutral-800 rounded text-blue-400" title="New Data Source"><Plus className="w-4 h-4" /></button>}
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                        {activeTab === 'tests' && files.map(file => (
-                            <div key={file.path} className="group relative">
-                                <button onClick={() => loadFile(file.path)} className={cn("w-full text-left px-4 py-3 rounded-2xl text-sm flex items-center space-x-3 transition-all duration-200 group-hover:pr-10", selectedFile === file.path ? "bg-purple-600 text-white shadow-lg shadow-purple-900/40" : "hover:bg-neutral-800/50 text-neutral-400")}>
-                                    <FileCode className={cn("w-4 h-4", selectedFile === file.path ? "text-white" : "text-purple-500")} /><span className="truncate font-medium">{file.name}</span>
+                        {activeTab === 'tests' && (
+                            <>
+                                {files.map(file => (
+                                    <div key={file.path} className="group relative">
+                                        <button onClick={() => loadFile(file.path)} className={cn("w-full text-left px-4 py-3 rounded-2xl text-sm flex items-center space-x-3 transition-all duration-200 group-hover:pr-10", selectedFile === file.path ? "bg-purple-600 text-white shadow-lg shadow-purple-900/40" : "hover:bg-neutral-800/50 text-neutral-400")}>
+                                            <FileCode className={cn("w-4 h-4", selectedFile === file.path ? "text-white" : "text-purple-500")} /><span className="truncate font-medium">{file.name}</span>
+                                        </button>
+                                        <button onClick={(e) => openDeleteFile(file.path, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 text-neutral-600 hover:text-red-400 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                    </div>
+                                ))}
+                                {files.length === 0 && <div className="p-4 text-center text-neutral-600 text-xs italic">No scripts found. Create one to get started.</div>}
+                            </>
+                        )}
+                        {activeTab === 'data' && dataFiles.map(file => (
+                            <div key={file} className="group relative">
+                                <button onClick={() => loadDataFile(file)} className={cn("w-full text-left px-4 py-3 rounded-2xl text-sm flex items-center space-x-3 transition-all duration-200 group-hover:pr-10", selectedDataFile === file ? "bg-blue-600 text-white shadow-lg shadow-blue-900/40" : "hover:bg-neutral-800/50 text-neutral-400")}>
+                                    <Database className={cn("w-4 h-4", selectedDataFile === file ? "text-white" : "text-blue-500")} /><span className="truncate font-medium">{file}</span>
                                 </button>
-                                <button onClick={(e) => deleteFile(file.path, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 text-neutral-600 hover:text-red-400 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                <button onClick={(e) => openDeleteDataFile(file, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 text-neutral-600 hover:text-red-400 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
                         ))}
                         {activeTab === 'pom' && pages.map(page => (
@@ -404,7 +521,7 @@ export default function ManagementPage() {
                                 <button onClick={() => setSelectedPage(page)} className={cn("w-full text-left px-4 py-3 rounded-2xl text-sm flex items-center space-x-3 transition-all duration-200 group-hover:pr-10", selectedPage?.id === page.id ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40" : "hover:bg-neutral-800/50 text-neutral-400")}>
                                     <LayoutTemplate className={cn("w-4 h-4", selectedPage?.id === page.id ? "text-white" : "text-emerald-500")} /><span className="truncate font-medium">{page.name}</span>
                                 </button>
-                                <button onClick={(e) => deletePage(page.id, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 text-neutral-600 hover:text-red-400 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                <button onClick={(e) => openDeletePage(page.id, e)} className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 text-neutral-600 hover:text-red-400 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
                         ))}
                     </div>
@@ -416,8 +533,55 @@ export default function ManagementPage() {
                             {selectedFile.endsWith('.json') && (() => {
                                 try {
                                     const steps = JSON.parse(fileContent || '[]');
-                                    return <NoCodeStepBuilder steps={steps} onStepsChange={(newSteps) => setFileContent(JSON.stringify(newSteps, null, 2))} />;
-                                } catch (e) {
+                                    return (
+                                        <div className="space-y-4">
+                                            {/* AI Prompt Interface - Top Left */}
+                                            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-xl">
+                                                <div className="flex items-center space-x-2 mb-3">
+                                                    <Sparkles className="w-4 h-4 text-purple-400" />
+                                                    <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest">AI Agent</h4>
+                                                </div>
+                                                <div className="flex space-x-2">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Describe a test case (e.g. 'Login to google.com and search for AI')..." 
+                                                        className="flex-1 bg-black/50 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-neutral-200 outline-none focus:border-purple-500 transition-colors"
+                                                        onKeyDown={async (e) => {
+                                                            if (e.key === 'Enter') {
+                                                                const target = e.target as HTMLInputElement;
+                                                                const prompt = target.value;
+                                                                if (!prompt) return;
+                                                                target.value = 'Generating steps...';
+                                                                target.disabled = true;
+                                                                try {
+                                                                    const res = await fetch('/api/ai', {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({ prompt })
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (data.success) {
+                                                                        setFileContent(JSON.stringify(data.steps, null, 2));
+                                                                        target.value = '';
+                                                                    } else {
+                                                                        alert('AI Error: ' + data.error);
+                                                                        target.value = prompt;
+                                                                    }
+                                                                } catch (err) {
+                                                                    console.error(err);
+                                                                    target.value = prompt;
+                                                                } finally {
+                                                                    target.disabled = false;
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <NoCodeStepBuilder steps={steps} onStepsChange={(newSteps) => setFileContent(JSON.stringify(newSteps, null, 2))} />
+                                        </div>
+                                    );
+                                } catch (_e) {
                                     return (
                                         <div className="p-4 bg-red-900/20 border border-red-900/50 rounded-2xl text-red-400 text-xs flex items-center space-x-2">
                                             <XCircle className="w-4 h-4" />
@@ -440,6 +604,18 @@ export default function ManagementPage() {
                             </div>
                             <TerminalWindow logs={terminalLogs} onClear={() => setTerminalLogs([])} />
                         </div>
+                    ) : activeTab === 'data' && selectedDataFile ? (
+                        <div className="flex flex-col space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                             <div className="bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+                                <div className="px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-black/20">
+                                    <div className="flex items-center space-x-3"><div className="p-2 bg-blue-500/10 rounded-lg"><Database className="w-4 h-4 text-blue-400" /></div><span className="font-mono text-xs text-neutral-300">{selectedDataFile}</span></div>
+                                    <div className="flex items-center space-x-4">
+                                        <button onClick={saveDataFile} className="p-2 hover:bg-white/5 rounded-lg text-neutral-400 hover:text-white transition-all" title="Save Data"><Save className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                                <div className="h-[600px]"><Editor height="100%" theme="vs-dark" language="json" value={dataContent} onChange={v => setDataContent(v || '')} options={{ minimap: { enabled: false }, fontSize: 13, padding: { top: 20 } }} /></div>
+                            </div>
+                        </div>
                     ) : activeTab === 'pom' && selectedPage ? (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
                              <div className="bg-[#111111] border border-neutral-800/50 p-8 rounded-[2rem] shadow-2xl">
@@ -451,7 +627,7 @@ export default function ManagementPage() {
                                             <p className="text-xs text-neutral-500 font-mono italic">{selectedPage.url || 'No Base URL'}</p>
                                         </div>
                                     </div>
-                                    <button onClick={addSelector} className="flex items-center space-x-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-900/20"><Plus className="w-4 h-4" /><span>ADD SELECTOR</span></button>
+                                    <button onClick={openAddSelector} className="flex items-center space-x-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-lg shadow-emerald-900/20"><Plus className="w-4 h-4" /><span>ADD SELECTOR</span></button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {selectors.map(sel => (
@@ -479,9 +655,22 @@ export default function ManagementPage() {
                              }} />
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-neutral-600 space-y-4 animate-in fade-in duration-700">
-                             <div className="p-8 bg-neutral-900/50 rounded-full border border-neutral-800 shadow-inner"><FolderOpen className="w-16 h-16 opacity-10" /></div>
-                             <p className="text-sm font-medium tracking-wide">Select a module from the explorer to begin management</p>
+                        <div className="h-full flex flex-col items-center justify-center text-neutral-600 space-y-6 animate-in fade-in duration-700">
+                             <div className="p-8 bg-neutral-900/50 rounded-full border border-neutral-800 shadow-inner group transition-all hover:scale-110 hover:border-purple-500/30">
+                                <FolderOpen className="w-16 h-16 opacity-20 group-hover:opacity-100 group-hover:text-purple-500 transition-all" />
+                             </div>
+                             <div className="text-center space-y-2">
+                                <p className="text-lg font-bold text-neutral-300">Welcome to Management Center</p>
+                                <p className="text-sm text-neutral-500">Select a file from the explorer or create a new one to get started</p>
+                             </div>
+                             <div className="flex gap-4">
+                                <button onClick={openCreateFile} className="flex items-center space-x-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40">
+                                    <Plus className="w-5 h-5" /><span>Create Script</span>
+                                </button>
+                                <button onClick={openCreatePage} className="flex items-center space-x-2 px-6 py-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold transition-all border border-neutral-700">
+                                    <LayoutTemplate className="w-5 h-5" /><span>Create Page Object</span>
+                                </button>
+                             </div>
                         </div>
                     )}
                 </section>

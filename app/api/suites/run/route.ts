@@ -1,8 +1,6 @@
-
 import { NextResponse } from 'next/server';
 import { getTestsWithTags, readTestFile } from '@/lib/files';
-import { TestRunner } from '@/lib/test-runner';
-import { runManager } from '@/lib/run-manager';
+import { TestRunner } from '@/lib/test-runner-v2';
 
 export async function POST(req: Request) {
   try {
@@ -20,38 +18,37 @@ export async function POST(req: Request) {
 
     const results: any[] = [];
     const queue = [...tests];
-    const workers = [];
-
-    const runWorker = async () => {
-        while (queue.length > 0) {
-            const test = queue.shift();
-            if (!test) break;
-
+    
+    // We will process the queue sequentially for now to avoid complexity with multiple browsers in one request, 
+    // or limit concurrency if we implement it.
+    
+    // Helper to process one test
+    const runTest = async (test: any) => {
+        try {
+            const content = await readTestFile(test.path);
+            const steps = Array.isArray(content) ? content : (content.steps || []);
+            
+            const runner = new TestRunner();
+            await runner.init(true); // Headless
+            
             try {
-                const content = await readTestFile(test.path);
-                const steps = Array.isArray(content) ? content : (content.steps || []);
-                const runner = new TestRunner({ headless: true });
-                const runKey = `suite-${tag}-${test.name}-${Date.now()}`;
-                runManager.register(runKey, runner);
-                
-                try {
-                    const result = await runner.runFlow(0, steps);
-                    results.push({ name: test.name, success: result.success, duration: result.duration });
-                } finally {
-                    runManager.unregister(runKey);
-                }
+                const result = await runner.runTest(steps);
+                await runner.close();
+                return { name: test.name, success: result.status === 'passed', duration: result.duration };
             } catch (e: any) {
-                results.push({ name: test.name, success: false, error: e.message });
+                await runner.close();
+                return { name: test.name, success: false, error: e.message };
             }
+        } catch (e: any) {
+            return { name: test.name, success: false, error: e.message };
         }
     };
 
-    // Launch workers up to concurrency limit
-    for (let i = 0; i < Math.min(concurrency, tests.length); i++) {
-        workers.push(runWorker());
+    // Process all tests
+    for (const test of tests) {
+        const result = await runTest(test);
+        results.push(result);
     }
-
-    await Promise.all(workers);
 
     const totalPassed = results.filter(r => r.success).length;
     

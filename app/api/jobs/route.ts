@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
-import { scheduleJob, stopJob, initScheduler } from '@/lib/cron'; // We might need to adjust import if lib/cron.ts is not compliant with Next.js edge runtime (it uses node-cron which is Node only, so valid for Node runtime)
+import { stopJob } from '@/lib/cron'; // We might need to adjust import if lib/cron.ts is not compliant with Next.js edge runtime (it uses node-cron which is Node only, so valid for Node runtime)
 
 // Initialize scheduler on first load of this route (lazy init for dev)
 let initialized = false;
@@ -10,7 +10,7 @@ if (!initialized) {
     initialized = true;
 }
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
     const jobs = db.prepare('SELECT * FROM scheduled_jobs ORDER BY created_at DESC').all();
     return NextResponse.json({ success: true, jobs });

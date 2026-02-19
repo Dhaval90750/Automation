@@ -1,12 +1,13 @@
 
 import { NextResponse } from 'next/server';
-import { TestRunner, TestStep } from '@/lib/test-runner';
+import { TestRunner } from '@/lib/test-runner-v2';
+import db from '@/lib/db';
 import { runManager } from '@/lib/run-manager';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const steps: TestStep[] = body.steps;
+    const steps: any[] = body.steps;
 
     if (!steps || !Array.isArray(steps)) {
       return NextResponse.json({ error: 'Invalid steps format' }, { status: 400 });
@@ -14,14 +15,17 @@ export async function POST(req: Request) {
 
     const data = body.data || {};
     const runner = new TestRunner();
-    const runKey = `adhoc-${Date.now()}`;
-    runManager.register(runKey, runner);
+    await runner.init();
+    
+    // Create a unique run ID for tracking if needed, though V2 handles artifacts internally
     
     try {
-        const result = await runner.runFlow(0, steps, data);
+        const result = await runner.runTest(steps, data);
+        await runner.close();
         return NextResponse.json({ success: true, result });
-    } finally {
-        runManager.unregister(runKey);
+    } catch (e: any) {
+        await runner.close();
+        throw e;
     }
   } catch (error: any) {
     console.error('Test Runner Error:', error);
