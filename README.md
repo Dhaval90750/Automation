@@ -1,45 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Automation Platform
+
+A powerful, all-in-one automation testing platform built with Next.js, Playwright, and AI.
+
+## Features
+
+- **Universal Language Support**: Run test scripts in **Python**, **JavaScript/TypeScript**, **Ruby**, **Go**, **Bash**, and more. The platform dynamically executes the appropriate runner based on file extensions.
+- **Visual Regression Testing**: Pixel-perfect UI comparison using `pixelmatch`. Automatically captures baselines and detects visual differences.
+- **AI Copilot**: Generate test steps, Selectors, and code using natural language prompts powered by Google Gemini.
+- **Interactive Recorder**: Record browser interactions and convert them into robust Playwright scripts.
+- **Web Scraper**: Extract data and generate test scenarios from any URL.
+- **Workflow Builder**: Create complex automation workflows with a node-based editor (Testing, Conditions, Loops, Webhooks).
+- **Cron Scheduler**: Schedule tests to run automatically at specific intervals.
+- **Data-Driven Testing**: Parametrize tests using JSON or CSV data sources.
+- **CI/CD Integration**: Generate GitHub Actions workflows for your tests.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- Python 3.8+ (for Python tests)
+- Playwright Browsers (`npx playwright install`)
+
+### Installation
+
+1.  Clone the repository:
+
+    ```bash
+    git clone https://github.com/Dhaval90750/Automation.git
+    cd Automation
+    ```
+
+2.  Install dependencies:
+
+    ```bash
+    npm install
+    ```
+
+3.  Set up environment variables:
+    Create a `.env.local` file in the root directory:
+
+    ```env
+    GEMINI_API_KEY=your_api_key_here
+    ```
+
+4.  Run the development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Usage
+
+### Running Tests
+
+1.  Navigate to the **Command Center**.
+2.  Select a test file from the explorer or create a new one.
+3.  Click **Run Test**.
+4.  View real-time logs and results in the terminal.
+
+### Visual Regression
+
+To perform a visual check in your test steps (JSON mode or Workflow):
+
+```json
+{
+  "type": "visual_check",
+  "name": "homepage-baseline"
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **First Run**: Creates a baseline image in `tests/snapshots/baseline`.
+- **Subsequent Runs**: Compares against the baseline. Fails if differences are detected.
+- **Review**: Check `public/artifacts/diffs` for the diff image.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Universal Script Execution
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The platform automatically detects the language:
 
-- **Web Scraper:** Extract data and generate tests from any URL.
-- **Interactive Recorder:** Record browser interactions to create Playwright scripts.
-- **AI Copilot:** Generate test steps and Python code using natural language.
-- **Cron Scheduler:** Schedule tests to run automatically at specific times.
-- **Data-Driven Testing:** Run parameterized tests using CSV or JSON data sources.
-- **Visual Regression:** Detect UI changes with pixel-perfect screenshot comparison.
-- **API Testing:** Perform HTTP requests and validate API responses within UI tests.
-- **CI/CD Generator:** Automatically create GitHub Actions workflows.
+- `.py`: Executes with `python -m pytest` or `python`.
+- `.js`/`.ts`: Executes with `npx playwright test`.
+- `.rb`: Executes with `ruby`.
+- `.sh`: Executes with `bash`.
+- ...and more!
 
-## Learn More
+## Project Structure
 
-To learn more about Next.js, take a look at the following resources:
+- `app/`: Next.js application routes and components.
+- `lib/`: Core logic (Test Runner, Visual Tester, Workflow Engine).
+- `components/`: Reusable UI components.
+- `public/artifacts/`: Test artifacts (screenshots, videos, traces).
+- `tests/`: Default directory for test scripts.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
